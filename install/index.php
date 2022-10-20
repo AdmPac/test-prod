@@ -1,7 +1,7 @@
 <?php
 use \Bitrix\Main\{
     Localization\Loc,
-    Loader,
+    Loader, 
     Type\DateTime,
     EventManager,
     Config\Option

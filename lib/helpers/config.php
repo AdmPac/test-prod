@@ -1,6 +1,8 @@
 <?php
 namespace Nebo\CashRegister;
 
+use \Bitrix\Main\Localization\Loc as Loc; 
+
 class config
 {
     /**
@@ -22,6 +24,10 @@ class config
     public const CASHREGISTER_DATE_RECONCILIATION_FIELD = 'DATE_RECONCILIATION'; // Название поля, с датой утверждения акта
     public const CASHREGISTER_AGREED_EMPLOYEE_FIELD = 'AGREED_EMPLOYEE'; // Название поля, с сотрудником, утвердившим акт (начальник участка)
     public const CASHREGISTER_APPROVED_EMPLOYEE_FIELD = 'APPROVED_EMPLOYEE'; // Название поля, с юзером, который утвердил акт
+    public const CASHREGISTER_CREATOR_EMPLOYEE_FIELD = 'CREATOR_EMPLOYEE'; // Название поля, с юзером, который утвердил акт
+    public const CASHREGISTER_SECTION_FOREMEN = 'UF_CRM_1568623837'; // НУ
+    public const CASHREGISTER_FOREMEN = 'UF_CRM_1568623890'; // Прораб
+    public const CASHREGISTER_PLAN_MONEY_DEAL = 'UF_CRM_1568623717'; // План по доходу в сделке
     public const CASHREGISTER_DEF_ACCESS_STATUS = 1631; // Статус назначения доступов по-умолчанию
     public const CASHREGISTER_ACCEPTED_ACCESS_STATUS = 1632; // Статус назначения доступов ПРИНЯТОГО акта
     public const CASHREGISTER_REJECTED_ACCESS_STATUS = 1676; // Статус назначения доступов ОТКЛОНЁННОГО акта
@@ -82,25 +88,25 @@ class config
      * @param $element - проверяемый элемент
      * @param $rules - правила, которые необходимо проверить у текущего элемент
      * @return string[]|void
-     *
+     * 
      * Проверка вводимого типа на правила.
      */
     public static function checkType($element, array $rules): array
     {
-        if (!$element && $rules['required']) return ['status' => 'error', 'text' => 'Элемент обязателен к заполнению!'];
-        switch (self::TYPE_FIELDS_LINK[$rules['types'][0]]['checkType']) {
-            case 'php':
-                return in_array(gettype($element),$rules['types']) || !$rules['required']
-                ? self::STATUS_SUCCESS
-                : self::status(self::STATUS_ERROR, "Ошибка типа. Ожидается ". implode(", ", $rules['types']));
-            case 'bx24': switch ($rules['types'][0]) {
-                case 'enumeration': return in_array($element, array_map(function ($i) {return $i['value'];}, $rules["value"]))
-                    ? self::STATUS_SUCCESS
-                    : self::status(self::STATUS_ERROR, "Варианта {$element}, нет среди возможных: ",  json_encode(array_map(function ($i) {return $i['value'];}, $rules["value"]), JSON_UNESCAPED_UNICODE));
-            }
-                return self::status(self::STATUS_ERROR, "В данный момент " . self::TYPE_FIELDS_LINK[gettype($element)]['title'] . " не поддерживается");
+        if(!$element)//пропускаем пустой элемент, т.к. нельзя проверить его тип
+           return self::STATUS_SUCCESS;
+        
+            foreach($rules['types'] as $typeName){//если затесался какой-то несуществующий тип
+                if(!isset(self::TYPE_FIELDS_LINK[$typeName]))
+                    return self::status(self::STATUS_ERROR, Loc::getMessage('NEBO_CASHREGISTER_SYSTEM_ERROR_CHECKTYPE') . json_encode([$element, $rules]));
         }
-        return self::status(self::STATUS_ERROR, "Системная ошибка. checkType" . json_encode([$element, $rules]));
+
+        $typeValue = array_map(function ($i) {return $i['value'];}, $rules["value"]);
+
+        if(!(in_array(gettype($element),$rules['types'])||in_array($element,$typeValue)))//несоответствие данных и их типов(передали строку, а ожидалось целое число)
+            return self::status(self::STATUS_ERROR, Loc::getMessage('NEBO_CASHREGISTER_TYPE_ERROR'). implode(", ", $rules['types']));
+
+        return self::STATUS_SUCCESS;
     }
 
     /**
@@ -146,21 +152,32 @@ class config
      *
      * Функция для получения пользователей в родительском департаменте пользователя.
      */
-    public static function getParentDepartment(int $user, $lvl): array
+    public static function getParentDepartment(int $user, $lvl = null): array
     {
-        $departments['check'] = \Bitrix\Main\UserTable::getList(['filter' => ['ID' => $user], 'select' => ['UF_DEPARTMENT']])->Fetch()['UF_DEPARTMENT'];
-        $departments['list'] = $departments['result'] = [];
-        $departments['query'] = self::DepartmentStructure(['DEPTH_LEVEL' => 'desc'], ['ID', 'DEPTH_LEVEL', 'IBLOCK_SECTION_ID', 'UF_HEAD']);
-        while($ar = $departments['query']->fetch()) { $departments['list'][$ar['ID']] = $ar; }
+        $arrDep = [];
+        $depID = \Bitrix\Main\UserTable::getList(['filter' => ['ID' => $user], 'select' => ['UF_DEPARTMENT']])->Fetch()['UF_DEPARTMENT'];
+        
+        foreach($depID as $v){//поддержка нескольких веток, lvl у всех общий
+            $i=0;
+            $k = $v;
+            
+            while(true){
+                if($lvl>0&&$i>$lvl) break;//оптимизация - нет смысла идти дальше по ветке, если мы уже находимся на lvl
+                
+                $que = config::DepartmentStructure(['DEPTH_LEVEL' => 'desc'], ['ID'=>$v, 'DEPTH_LEVEL', 'IBLOCK_SECTION_ID', 'UF_HEAD']);//добавить возможность прохода по нескольким веткам
+                $dataDep = $que->fetch();
+                
+                $arrDep[$k][] = $dataDep;
+                
+                $v = $dataDep['IBLOCK_SECTION_ID'];
 
-        foreach ($departments['check'] as $i) {
-            $departments['result'][$i] = ($lvl !== null)
-                ? self::getTree($i, $departments['list'], 'IBLOCK_SECTION_ID')[$lvl] ?? null
-                : self::getTree($i, $departments['list'], 'IBLOCK_SECTION_ID');
+                if(!$dataDep['IBLOCK_SECTION_ID']) break;
+            }
         }
-        return $departments['result'];
+        return $arrDep;
     }
 
+    
     /**
      * @param $children_id - ID дочернего отдела, кот которого будет проходить поиск
      * @param $data - дата, по которой ищем дерево
@@ -168,7 +185,7 @@ class config
      * @param array $parents - для рекурсии
      * @return array
      *
-     * РЕКУРСИВНАЯ ФУНКЦИЯ
+     * !!!УСТАРЕВШИЙ МЕТОД!!! - УЛУЧШЕННАЯ РЕАЛИЗАЦИЯ В МЕТОДЕ self::getParentDepartment
      * Получить древовидную последовательность
      * @todo функция перегружена, так как загружает все департаменты, есть смысл выгружать исключительно дерево
      */
@@ -184,6 +201,5 @@ class config
         }
         return $parents;
     }
-
 
 }

@@ -24,6 +24,8 @@ CModule::AddAutoloadClasses(
         "\\Nebo\\CashRegister\\Config" => "lib/helpers/config.php",
         "\\Nebo\\CashRegister\\Act" => "classes/general/act.php",
         "\\Nebo\\CashRegister\\Access" => "classes/general/access.php",
+        "\\Nebo\\CashRegister\\Settings" => "classes/general/settings.php",
+        "\\Nebo\\CashRegister\\analytics" => "classes/general/analytics.php",
         // REST API controllers
         "\\Nebo\\CashRegister\\Api\\Act" => "lib/api/general/act.php",
         "\\Nebo\\CashRegister\\Api\\Lists" => "lib/api/general/lists.php",

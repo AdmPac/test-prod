@@ -22,7 +22,7 @@ class presets
      *
      * Основной метод запросов CIBlockElement::GetList
      * https://dev.1c-bitrix.ru/api_help/iblock/classes/ciblockelement/getlist.php
-     *
+     * 
      * Метод выполняет запрос на определённую таблицу по классу, и возвращает определённые поля ID/TITLE/CODE см. $select
      * Данные берутся по PROPERTY_<PROPERTY_CODE>, где PROPERTY_CODE - символьный код
      * наследует стандартные методы GetList (GetNextElement/GetNext/Fetch...)
@@ -37,7 +37,23 @@ class presets
         return \CIBlockElement::GetList([], $filter, false, false, $select ?? config::LIST_CASHREGISTER_PRESETS_LIST);
     }
 
+    /**
+     * @return array
+     * Глобальный getRules по всем имеющимся в инфоблоке дан ным
+     */
+    public static function getRulesAll() : array
+    {
+        $ibl = \CIBlockElement::GetList([], ['IBLOCK_ID'=>115], false, false, ['ID', 'NAME', 'CODE']);//вынести 
 
+        $result = [];
+        while($r = $ibl->fetch()){
+            $id = $r['ID'];
+            $result[] = self::getRules((int)$id);
+        }            
+        return $result;
+    }
+    
+    
 
     /**
      * @param $id - если строка идёт проверка с кодом пресета (CODE) если число - по ID
@@ -57,17 +73,21 @@ class presets
             'PROPERTY_FIELDS_FILL.PROPERTY_PARAMS',
             'PROPERTY_FIELDS_FILL.CODE',
             // Информация об обязательных полях
-            'PROPERTY_REQUIRED_FIELDS',
+            'PROPERTY_REQUIRED_FIELDS.ID',
+            'PROPERTY_REQUIRED_FIELDS.NAME',
+            'PROPERTY_REQUIRED_FIELDS.CODE',
+            'PROPERTY_REQUIRED_FIELDS.PROPERTY_FORMAT',
+            'PROPERTY_REQUIRED_FIELDS.PROPERTY_PARAMS',
             // Дополнительная информация из основного списка
             'ID',
             'NAME',
             'PROPERTY_ADDITIONAL_INFORMATION',
             'CODE'
         ];
+        
         $filter = gettype($id) === "string" ? ['CODE' => $id] : ['ID' => $id];
         $query = self::getList($filter, $select);
         while ($i = $query->Fetch()) {
-            print_r($i);
             if (!$return) {
 
                 $add_data['query'] = json_decode($i['PROPERTY_ADDITIONAL_INFORMATION_VALUE'], true);
@@ -79,20 +99,29 @@ class presets
                 $return = [
                     'ID' => $i['ID'],
                     'NAME' => $i['NAME'],
-                    config::CASHREGISTER_ADD_FIELD => $add_data['result'],
+                     config::CASHREGISTER_ADD_FIELD => $add_data['result'],
                     'CODE' => $i['CODE'],
                 ];
             }
             if ($i['PROPERTY_FIELDS_FILL_CODE']) $return[config::CASHREGISTER_EXPENDITURE_FIELD][$i['PROPERTY_FIELDS_FILL_CODE']] = [
-                'required' => in_array($i['PROPERTY_REQUIRED_FIELDS'], $i['PROPERTY_FIELDS_FILL_ID']),
+                'required' => 0,
                 'title' => $i['PROPERTY_FIELDS_FILL_NAME'],
                 'code' => $i['PROPERTY_FIELDS_FILL_CODE'],
                 'id' => $i['PROPERTY_FIELDS_FILL_ID'],
                 'types' => json_decode($i['PROPERTY_FIELDS_FILL_PROPERTY_PARAMS_VALUE'], true)['types'],
                 'format' => $i['PROPERTY_FIELDS_FILL_PROPERTY_FORMAT_ENUM_ID'],
             ];
+            if ($i['PROPERTY_REQUIRED_FIELDS_CODE']) $return[config::CASHREGISTER_EXPENDITURE_FIELD][$i['PROPERTY_REQUIRED_FIELDS_CODE']] = [
+                'required' => 1,
+                'title' => $i['PROPERTY_REQUIRED_FIELDS_NAME'],
+                'code' => $i['PROPERTY_REQUIRED_FIELDS_CODE'],
+                'id' => $i['PROPERTY_REQUIRED_FIELDS_ID'],
+                'types' => json_decode($i['PROPERTY_REQUIRED_FIELDS_PROPERTY_PARAMS_VALUE'], true)['types'],
+                'format' => $i['PROPERTY_REQUIRED_FIELDS_PROPERTY_FORMAT_ENUM_ID'],
+            ];
         }
         self::$list[$id] = $return;
+        
         return $return;
     }
 
@@ -106,7 +135,7 @@ class presets
     public static function checkRules($id, $data): array
     {
         $rules = self::getRules($id);
-//        print_r($rules);
+
         // Необходим общий список проверяемых параметров
         $checkRules['params'] = [];
         foreach (config::CASHREGISTER_CHECK_LIST as $i){
@@ -117,6 +146,7 @@ class presets
         foreach ($checkRules['params'] as $k => $v) {
             $checkRules['response'][$k] = config::checkType($data[$k], $v);
         }
+
         return $checkRules;
     }
 

@@ -57,7 +57,7 @@ class access
         foreach ($list as $i) {
             if (!in_array($i['GROUP_CODE'], $exceptions)) $rules[$i['GROUP_CODE']] = 'D';
         }
-        return $rules;
+        return $rules; 
     }
 
     /**
@@ -176,6 +176,7 @@ class access
                             case 'parent_manager': {
                                 $parentDepartment = array_column(config::getParentDepartment($data['deal'][$k], $i2['params']), 'UF_HEAD');
                                 foreach ($parentDepartment as $i5) {
+                                    if(!$i5) continue;
                                     $response[$pref['USER'].$i5] = $i2['letter'];
                                 }
                                 break;

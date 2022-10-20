@@ -5,7 +5,7 @@ namespace Nebo\CashRegister;
  * Класс отвечает за оперирование с листом актов, основной не глобальный класс
  */
 class lists
-{
+{ 
     /**
      * @param $code - код блока CASHREGISTER_MAIN / 92
      * @return int - возврат кода

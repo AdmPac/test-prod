@@ -26,9 +26,32 @@ class Act extends \Bitrix\Main\Engine\Controller
         return ActModule::accept($actID);
     }
 
+    public function acceptArrayAction($actsID)
+    {
+        foreach($actsID as $k=>$id){
+            $actsID[$k] = intval($id);
+        }
+        return ActModule::acceptArray($actsID);
+    }
+
+
+    public function rejectedArrayAction($actsID)
+    {
+        foreach($actsID as $k=>$id){
+            $actsID[$k] = intval($id);
+        }
+        return ActModule::rejectedArray($actsID);
+    }
+
     public function rejectedAction($actID)
     {
         $actID = intval($actID);
         return ActModule::rejected($actID);
     }
+    
+    public function calcActByDealIdAction($idEntity){
+        $idEntity = intval($idEntity);
+        return ActModule::calcActByDealId($idEntity);
+    }
+
 }

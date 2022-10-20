@@ -1,7 +1,6 @@
 <?php
 
 namespace Nebo\CashRegister\Api;
-
 use Nebo\CashRegister\Presets as PresetsModule;
 
 
@@ -25,6 +24,11 @@ class Presets extends \Bitrix\Main\Engine\Controller
         return $res;
     }
 
+    public function getRulesAllAction()
+    {
+        return PresetsModule::getRulesAll();
+    }
+    
     public function getRulesAction($element)
     {
         if (is_numeric($element)) {
